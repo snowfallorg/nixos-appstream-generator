@@ -1,0 +1,9 @@
+[package]
+name = "nixos-appstream"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+xmltree = "0.10.3"
+serde_json = "1.0"
+clap = { version = "3.1.18", features = ["derive"] }
