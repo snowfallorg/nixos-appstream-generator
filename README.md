@@ -1,17 +1,18 @@
-# NixOS-Appstream
+# NixOS Appstream Generator
 
-A proof of concept appstream data generator for NixOS. Currently extremely inefficient and lacking a lot of features.
+A small program that iterates over a list of nix packages and extracts appstream data.
 
 ```
 Generate Appstream data for a given package
 
 USAGE:
-    nixos-appstream [OPTIONS] --package <PACKAGE>
+    nixos-appstream-generator [OPTIONS]
 
 OPTIONS:
-    -c, --combine <COMBINE>    File to write combined Appstream data to
+    -c, --clean                Weather to clean nix-store periodically
+    -d, --data <DATA>          Customization json file
     -h, --help                 Print help information
-    -o, --output <OUTPUT>      Were to output the Appstream data [default: result.xml]
+    -l, --list <LIST>          Path to text file with a list of packages to check
     -p, --package <PACKAGE>    Package to generate Appstream data for
     -V, --version              Print version information
 ```

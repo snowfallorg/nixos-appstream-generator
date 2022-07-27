@@ -1,0 +1,15 @@
+{
+  "discord": {
+    "metainfo": "https://raw.githubusercontent.com/flathub/com.discordapp.Discord/master/com.discordapp.Discord.appdata.xml"
+  },
+  "guake": {
+    "icon": "https://raw.githubusercontent.com/Guake/guake/c5cc554fcf0d2ff2f6ea157844b99261d53b965b/guake/data/pixmaps/guake-tray.svg"
+  },
+  "yuzu-ea": {
+    "id": "org.yuzu_emu.yuzu_ea",
+    "output": {
+      "icon": "org.yuzu_emu.yuzu_ea.png",
+      "metainfo": "org.yuzu_emu.yuzu_ea.xml"
+    }
+  }
+}

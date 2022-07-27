@@ -1,2 +1,7 @@
 /target
+/output*
+/logs
+/tmp
 /result
+.vscode
+shell.nix

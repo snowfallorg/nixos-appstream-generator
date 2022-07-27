@@ -13,13 +13,23 @@
     utils.lib.eachDefaultSystem
       (system:
        let 
-          name = "nixos-appstream";
+          name = "nixos-appstream-generator";
           pkgs = import nixpkgs { inherit system; };
           naersk-lib = naersk.lib."${system}";
         in rec {
           packages.${name} = naersk-lib.buildPackage {
             pname = "${name}";
             root = ./.;
+            copyLibs = true;
+            buildInputs = with pkgs; [
+              openssl
+              pkgconfig
+            ];
+          };
+
+          packages."pkglistgen" = naersk-lib.buildPackage {
+            pname = "pkglistgen";
+            root = ./pkglistgen;
             copyLibs = true;
           };
 
@@ -37,7 +47,12 @@
           devShells = {
             default = pkgs.mkShell {
               nativeBuildInputs = 
-                with pkgs; [ rustc cargo ] ;
+                with pkgs; [
+                    rustc
+                    cargo
+                    openssl
+                    pkgconfig
+                ];
             };
           };
         }
