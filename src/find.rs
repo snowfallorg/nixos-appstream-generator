@@ -238,7 +238,8 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
 
     if x.name == "application" {
         x.name = "component".to_string();
-        x.attributes.insert("type".to_string(), "desktop-application".to_string());
+        x.attributes
+            .insert("type".to_string(), "desktop-application".to_string());
     } else if x.name != "component" {
         println!(
             "{pkg}: {}: {meta}",
@@ -507,7 +508,7 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
     }
 
     // Fix description field translations
-    let desc_children = x
+    let mut desc_children = x
         .children
         .iter()
         .filter(|x| {
@@ -519,41 +520,9 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
         })
         .collect::<Vec<_>>();
     if desc_children.len() == 1 {
-        if let Some(d) = desc_children.get(0) {
-            let mut map: HashMap<String, Vec<xmltree::Element>> = HashMap::new();
-            if let Some(d) = d.as_element() {
-                for p in &d.children {
-                    if let Some(p) = p.as_element() {
-                        let mut p2 = p.clone();
-                        p2.attributes.clear();
-                        if let Some(l) = p.attributes.get("lang") {
-                            if let Some(v) = map.get_mut(l) {
-                                v.push(p2.clone());
-                            } else {
-                                map.insert(l.clone(), vec![p2.clone()]);
-                            }
-                        } else if let Some(v) = map.get_mut("") {
-                            v.push(p2.clone());
-                        } else {
-                            map.insert("".to_string(), vec![p2.clone()]);
-                        }
-                    }
-                }
-            }
-            let i = x.children.iter().position(|x| x.eq(d)).unwrap();
-            x.take_child("description").unwrap();
-            let mut mapvec = map.into_iter().collect::<Vec<_>>();
-            // Reverse order
-            mapvec.sort_by(|(x, _), (y, _)| y.cmp(x));
-            for (k, v) in mapvec {
-                let mut d = Element::parse("<description></description>".as_bytes()).unwrap();
-                if !k.is_empty() {
-                    d.attributes.insert("lang".to_string(), k);
-                }
-                for p in v.into_iter().rev() {
-                    d.children.insert(0, xmltree::XMLNode::Element(p));
-                }
-                x.children.insert(i, xmltree::XMLNode::Element(d));
+        if let Some(d) = desc_children.get_mut(0) {
+            if let Some(d) = d.clone().as_mut_element() {
+                fixtranslation(d, &mut x);
             }
         }
     }
@@ -571,14 +540,14 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
     };
 
     match x.write_with_config(
-        File::create(format!("output/metadata/{pkg}-{id}.xml")).unwrap(),
+        File::create(format!("output/metadata/{pkg}::{id}.xml")).unwrap(),
         writer,
     ) {
         Ok(_) => {
             match Command::new("sed")
                 .arg("-i")
                 .arg(r#"s/\xe2\x80\x8b//g"#)
-                .arg(&format!("output/metadata/{pkg}-{id}.xml"))
+                .arg(&format!("output/metadata/{pkg}::{id}.xml"))
                 .output()
             {
                 Ok(_) => {
@@ -630,7 +599,7 @@ pub fn xmlparse_nondesktop(meta: String, pkg: &str) {
     }
 
     // Fix description field translations
-    let desc_children = x
+    let mut desc_children = x
         .children
         .iter()
         .filter(|x| {
@@ -642,41 +611,9 @@ pub fn xmlparse_nondesktop(meta: String, pkg: &str) {
         })
         .collect::<Vec<_>>();
     if desc_children.len() == 1 {
-        if let Some(d) = desc_children.get(0) {
-            let mut map: HashMap<String, Vec<xmltree::Element>> = HashMap::new();
-            if let Some(d) = d.as_element() {
-                for p in &d.children {
-                    if let Some(p) = p.as_element() {
-                        let mut p2 = p.clone();
-                        p2.attributes.clear();
-                        if let Some(l) = p.attributes.get("lang") {
-                            if let Some(v) = map.get_mut(l) {
-                                v.push(p2.clone());
-                            } else {
-                                map.insert(l.clone(), vec![p2.clone()]);
-                            }
-                        } else if let Some(v) = map.get_mut("") {
-                            v.push(p2.clone());
-                        } else {
-                            map.insert("".to_string(), vec![p2.clone()]);
-                        }
-                    }
-                }
-            }
-            let i = x.children.iter().position(|x| x.eq(d)).unwrap();
-            x.take_child("description").unwrap();
-            let mut mapvec = map.into_iter().collect::<Vec<_>>();
-            // Reverse order
-            mapvec.sort_by(|(x, _), (y, _)| y.cmp(x));
-            for (k, v) in mapvec {
-                let mut d = Element::parse("<description></description>".as_bytes()).unwrap();
-                if !k.is_empty() {
-                    d.attributes.insert("lang".to_string(), k);
-                }
-                for p in v.into_iter().rev() {
-                    d.children.insert(0, xmltree::XMLNode::Element(p));
-                }
-                x.children.insert(i, xmltree::XMLNode::Element(d));
+        if let Some(d) = desc_children.get_mut(0) {
+            if let Some(d) = d.clone().as_mut_element() {
+                fixtranslation(d, &mut x);
             }
         }
     }
@@ -690,14 +627,14 @@ pub fn xmlparse_nondesktop(meta: String, pkg: &str) {
         .replace(".metainfo", "")
         .replace(".xml", "");
     match x.write_with_config(
-        File::create(format!("output/metadata/{pkg}-{id}.xml")).unwrap(),
+        File::create(format!("output/metadata/{pkg}::{id}.xml")).unwrap(),
         writer,
     ) {
         Ok(_) => {
             match Command::new("sed")
                 .arg("-i")
                 .arg(r#"s/\xe2\x80\x8b//g"#)
-                .arg(&format!("output/metadata/{pkg}-{id}.xml"))
+                .arg(&format!("output/metadata/{pkg}::{id}.xml"))
                 .output()
             {
                 Ok(_) => {
@@ -713,5 +650,50 @@ pub fn xmlparse_nondesktop(meta: String, pkg: &str) {
             }
         }
         Err(e) => println!("{pkg}: {}", e.if_supports_color(Stdout, |x| x.red())),
+    }
+}
+
+fn fixtranslation(d: &mut Element, x: &mut Element) {
+    let n = &d.name.to_string();
+    let mut map: HashMap<String, Vec<xmltree::Element>> = HashMap::new();
+    for p in d.clone().children {
+        if let Some(p) = p.as_element() {
+            if p.children.iter().any(|x| x.as_element().is_some()) {
+                let mut p = p.clone();
+                fixtranslation(&mut p, d);
+            }
+        }
+    }
+    for p in &d.children {
+        if let Some(p) = p.as_element() {
+            let mut p2 = p.clone();
+            p2.attributes.clear();
+            if let Some(l) = p.attributes.get("lang") {
+                if let Some(v) = map.get_mut(l) {
+                    v.push(p2.clone());
+                } else {
+                    map.insert(l.clone(), vec![p2.clone()]);
+                }
+            } else if let Some(v) = map.get_mut("") {
+                v.push(p2.clone());
+            } else {
+                map.insert("".to_string(), vec![p2.clone()]);
+            }
+        }
+    }
+    let i = x.children.iter().position(|x| if let Some(y) = x.as_element() { y.eq(d) } else { false }).unwrap_or_default();
+    x.take_child(n.as_str()).unwrap();
+    let mut mapvec = map.into_iter().collect::<Vec<_>>();
+    // Reverse order
+    mapvec.sort_by(|(x, _), (y, _)| y.cmp(x));
+    for (k, v) in mapvec {
+        let mut d = Element::parse(format!("<{n}></{n}>").as_bytes()).unwrap();
+        if !k.is_empty() {
+            d.attributes.insert("lang".to_string(), k);
+        }
+        for p in v.into_iter().rev() {
+            d.children.insert(0, xmltree::XMLNode::Element(p));
+        }
+        x.children.insert(i, xmltree::XMLNode::Element(d));
     }
 }
