@@ -2,6 +2,7 @@ use curl::easy::Easy;
 use image;
 use owo_colors::{OwoColorize, Stream::Stdout};
 use std::{
+    collections::HashMap,
     fs::{self, File},
     io::{BufRead, BufReader, Write},
     os::unix::prelude::PermissionsExt,
@@ -80,11 +81,16 @@ pub fn dlmeta(path: String, metaurl: String, pkg: &str, pkgdata: PkgData) {
 }
 
 fn genmeta(path: String, meta: Vec<String>, pkg: &str, pkgdata: PkgData) {
-
-    let desktops = match findfiles(Path::new(&format!("{}/share/applications", path)), "desktop") {
+    let desktops = match findfiles(
+        Path::new(&format!("{}/share/applications", path)),
+        "desktop",
+    ) {
         Ok(x) => x,
         Err(_) => {
-            println!("{pkg}: {}", "No desktop files found".if_supports_color(Stdout, |x| x.yellow()));
+            println!(
+                "{pkg}: {}",
+                "No desktop files found".if_supports_color(Stdout, |x| x.yellow())
+            );
             for m in meta {
                 xmlparse_nondesktop(m, pkg);
             }
@@ -107,8 +113,21 @@ fn genmeta(path: String, meta: Vec<String>, pkg: &str, pkgdata: PkgData) {
                 if let Ok(x) = Element::parse(f.as_bytes()) {
                     if x.attributes.get("type") == Some(&String::from("desktop"))
                         || x.attributes.get("type") == Some(&String::from("desktop-application"))
-                        || { if let Some(y) = x.get_child("id") { y.attributes.get("type") == Some(&String::from("desktop")) } else { false } }
-                        || { if let Some(y) = x.get_child("id") { y.attributes.get("type") == Some(&String::from("desktop-application")) } else { false } }
+                        || {
+                            if let Some(y) = x.get_child("id") {
+                                y.attributes.get("type") == Some(&String::from("desktop"))
+                            } else {
+                                false
+                            }
+                        }
+                        || {
+                            if let Some(y) = x.get_child("id") {
+                                y.attributes.get("type")
+                                    == Some(&String::from("desktop-application"))
+                            } else {
+                                false
+                            }
+                        }
                     {
                         let id = m
                             .split('/')
@@ -142,11 +161,17 @@ fn genmeta(path: String, meta: Vec<String>, pkg: &str, pkgdata: PkgData) {
                         }
 
                         if desktopfile.is_empty() {
-                            let mut filtered =  desktops.iter().filter(|x| x.to_lowercase().contains(&id.to_lowercase())).collect::<Vec<_>>();
+                            let mut filtered = desktops
+                                .iter()
+                                .filter(|x| x.to_lowercase().contains(&id.to_lowercase()))
+                                .collect::<Vec<_>>();
                             if filtered.len() == 1 {
                                 desktopfile = filtered[0].to_string();
                             } else {
-                                filtered = desktops.iter().filter(|x| x.contains("org") || x.contains("com")).collect::<Vec<_>>();
+                                filtered = desktops
+                                    .iter()
+                                    .filter(|x| x.contains("org") || x.contains("com"))
+                                    .collect::<Vec<_>>();
                                 if filtered.len() == 1 {
                                     desktopfile = filtered[0].to_string();
                                 }
@@ -162,9 +187,12 @@ fn genmeta(path: String, meta: Vec<String>, pkg: &str, pkgdata: PkgData) {
                 }
             }
         }
-        
+
         if metapairs.is_empty() {
-            println!("{} No metapair found for package {pkg}", "error:".if_supports_color(Stdout, |x| x.red()));
+            println!(
+                "{} No metapair found for package {pkg}",
+                "error:".if_supports_color(Stdout, |x| x.red())
+            );
             //std::process::exit(1);
         } else {
             if metapairs.len() == 1 {
@@ -200,10 +228,24 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
     let mut x = match Element::parse(f.as_bytes()) {
         Ok(x) => x,
         Err(_) => {
-            println!("{pkg}: {}: {meta}", "FAILED TO PARSE XML".if_supports_color(Stdout, |x| x.bright_red()));
+            println!(
+                "{pkg}: {}: {meta}",
+                "FAILED TO PARSE XML".if_supports_color(Stdout, |x| x.bright_red())
+            );
             return;
         }
     };
+
+    if x.name == "application" {
+        x.name = "component".to_string();
+        x.attributes.insert("type".to_string(), "desktop-application".to_string());
+    } else if x.name != "component" {
+        println!(
+            "{pkg}: {}: {meta}",
+            "Not a component or application".if_supports_color(Stdout, |x| x.red())
+        );
+        return;
+    }
 
     let mut icondata: Vec<String> = vec![];
     if let Some(i) = &pkgdata.icon {
@@ -337,12 +379,21 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
                         "<icon type=\"cached\" width=\"{size}\" height=\"{size}\">{iout}</icon>"
                     ));
                 } else {
-                    let sizes = vec![ 64, 72, 96, 128, 192, 256, 512, 1024 ].into_iter().filter(|x| *x >= size).collect::<Vec<u32>>();
+                    let sizes = vec![64, 72, 96, 128, 192, 256, 512, 1024]
+                        .into_iter()
+                        .filter(|x| *x >= size)
+                        .collect::<Vec<u32>>();
                     let mut scalepath = String::new();
                     for s in &sizes {
-                        if Path::new(&format!("{}/share/icons/hicolor/{s}x{s}/apps/{}.png", path, i)).exists() {
+                        if Path::new(&format!(
+                            "{}/share/icons/hicolor/{s}x{s}/apps/{}.png",
+                            path, i
+                        ))
+                        .exists()
+                        {
                             //scalesize = s;
-                            scalepath = format!("{}/share/icons/hicolor/{s}x{s}/apps/{}.png", path, i);
+                            scalepath =
+                                format!("{}/share/icons/hicolor/{s}x{s}/apps/{}.png", path, i);
                             break;
                         }
                     }
@@ -358,9 +409,15 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
                         ));
                     } else {
                         for s in &sizes {
-                            if Path::new(&format!("{}/share/icons/hicolor/{s}x{s}/apps/{}.svg", path, i)).exists() {
+                            if Path::new(&format!(
+                                "{}/share/icons/hicolor/{s}x{s}/apps/{}.svg",
+                                path, i
+                            ))
+                            .exists()
+                            {
                                 // scalesize = s;
-                                scalepath = format!("{}/share/icons/hicolor/{s}x{s}/apps/{}.svg", path, i);
+                                scalepath =
+                                    format!("{}/share/icons/hicolor/{s}x{s}/apps/{}.svg", path, i);
                                 break;
                             }
                         }
@@ -412,9 +469,15 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
     }
 
     if icondata.is_empty() {
-        println!("{pkg}: {}", "no desktop icons found".if_supports_color(Stdout, |x| x.bright_purple()));
+        println!(
+            "{pkg}: {}",
+            "no desktop icons found".if_supports_color(Stdout, |x| x.bright_purple())
+        );
     } else if icondata.len() == 1 {
-        println!("{pkg}: {}", "some desktop icons missing".if_supports_color(Stdout, |x| x.bright_purple()));
+        println!(
+            "{pkg}: {}",
+            "some desktop icons missing".if_supports_color(Stdout, |x| x.bright_purple())
+        );
     }
 
     for data in icondata {
@@ -443,6 +506,58 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
         x.children.insert(0, xmltree::XMLNode::Element(p));
     }
 
+    // Fix description field translations
+    let desc_children = x
+        .children
+        .iter()
+        .filter(|x| {
+            if let Some(y) = x.as_element() {
+                y.name == "description"
+            } else {
+                false
+            }
+        })
+        .collect::<Vec<_>>();
+    if desc_children.len() == 1 {
+        if let Some(d) = desc_children.get(0) {
+            let mut map: HashMap<String, Vec<xmltree::Element>> = HashMap::new();
+            if let Some(d) = d.as_element() {
+                for p in &d.children {
+                    if let Some(p) = p.as_element() {
+                        let mut p2 = p.clone();
+                        p2.attributes.clear();
+                        if let Some(l) = p.attributes.get("lang") {
+                            if let Some(v) = map.get_mut(l) {
+                                v.push(p2.clone());
+                            } else {
+                                map.insert(l.clone(), vec![p2.clone()]);
+                            }
+                        } else if let Some(v) = map.get_mut("") {
+                            v.push(p2.clone());
+                        } else {
+                            map.insert("".to_string(), vec![p2.clone()]);
+                        }
+                    }
+                }
+            }
+            let i = x.children.iter().position(|x| x.eq(d)).unwrap();
+            x.take_child("description").unwrap();
+            let mut mapvec = map.into_iter().collect::<Vec<_>>();
+            // Reverse order
+            mapvec.sort_by(|(x, _), (y, _)| y.cmp(x));
+            for (k, v) in mapvec {
+                let mut d = Element::parse("<description></description>".as_bytes()).unwrap();
+                if !k.is_empty() {
+                    d.attributes.insert("lang".to_string(), k);
+                }
+                for p in v.into_iter().rev() {
+                    d.children.insert(0, xmltree::XMLNode::Element(p));
+                }
+                x.children.insert(i, xmltree::XMLNode::Element(d));
+            }
+        }
+    }
+
     let writer = xmltree::EmitterConfig::new().perform_indent(true);
     let id = if let Some(customidout) = &pkgdata.outputmetainfo {
         customidout.replace(".xml", "")
@@ -467,7 +582,11 @@ pub fn xmlparse(path: &str, meta: String, desktop: String, pkg: &str, pkgdata: &
                 .output()
             {
                 Ok(_) => {
-                    println!("{pkg}: {}: {}", id.if_supports_color(Stdout, |x| x.cyan()), "Success!".if_supports_color(Stdout, |x| x.green()));
+                    println!(
+                        "{pkg}: {}: {}",
+                        id.if_supports_color(Stdout, |x| x.cyan()),
+                        "Success!".if_supports_color(Stdout, |x| x.green())
+                    );
                 }
                 Err(e) => {
                     println!("{pkg}: {}", e.if_supports_color(Stdout, |x| x.red()));
@@ -483,10 +602,21 @@ pub fn xmlparse_nondesktop(meta: String, pkg: &str) {
     let mut x = match Element::parse(f.as_bytes()) {
         Ok(x) => x,
         Err(_) => {
-            println!("{pkg}: {}: {meta}", "FAILED TO PARSE XML".if_supports_color(Stdout, |x| x.bright_green()));
+            println!(
+                "{pkg}: {}: {meta}",
+                "FAILED TO PARSE XML".if_supports_color(Stdout, |x| x.bright_green())
+            );
             return;
         }
     };
+
+    if x.name != "component" {
+        println!(
+            "{pkg}: {}: {meta}",
+            "Not a component".if_supports_color(Stdout, |x| x.red())
+        );
+        return;
+    }
 
     let pkgdata = format!("<pkgname>{}</pkgname>", pkg);
 
@@ -497,6 +627,58 @@ pub fn xmlparse_nondesktop(meta: String, pkg: &str) {
     } else {
         x.take_child("pkgname").unwrap();
         x.children.insert(0, xmltree::XMLNode::Element(p));
+    }
+
+    // Fix description field translations
+    let desc_children = x
+        .children
+        .iter()
+        .filter(|x| {
+            if let Some(y) = x.as_element() {
+                y.name == "description"
+            } else {
+                false
+            }
+        })
+        .collect::<Vec<_>>();
+    if desc_children.len() == 1 {
+        if let Some(d) = desc_children.get(0) {
+            let mut map: HashMap<String, Vec<xmltree::Element>> = HashMap::new();
+            if let Some(d) = d.as_element() {
+                for p in &d.children {
+                    if let Some(p) = p.as_element() {
+                        let mut p2 = p.clone();
+                        p2.attributes.clear();
+                        if let Some(l) = p.attributes.get("lang") {
+                            if let Some(v) = map.get_mut(l) {
+                                v.push(p2.clone());
+                            } else {
+                                map.insert(l.clone(), vec![p2.clone()]);
+                            }
+                        } else if let Some(v) = map.get_mut("") {
+                            v.push(p2.clone());
+                        } else {
+                            map.insert("".to_string(), vec![p2.clone()]);
+                        }
+                    }
+                }
+            }
+            let i = x.children.iter().position(|x| x.eq(d)).unwrap();
+            x.take_child("description").unwrap();
+            let mut mapvec = map.into_iter().collect::<Vec<_>>();
+            // Reverse order
+            mapvec.sort_by(|(x, _), (y, _)| y.cmp(x));
+            for (k, v) in mapvec {
+                let mut d = Element::parse("<description></description>".as_bytes()).unwrap();
+                if !k.is_empty() {
+                    d.attributes.insert("lang".to_string(), k);
+                }
+                for p in v.into_iter().rev() {
+                    d.children.insert(0, xmltree::XMLNode::Element(p));
+                }
+                x.children.insert(i, xmltree::XMLNode::Element(d));
+            }
+        }
     }
 
     let writer = xmltree::EmitterConfig::new().perform_indent(true);
@@ -519,7 +701,11 @@ pub fn xmlparse_nondesktop(meta: String, pkg: &str) {
                 .output()
             {
                 Ok(_) => {
-                    println!("{pkg}: {}: {}", id.if_supports_color(Stdout, |x| x.cyan()), "Addon success!".if_supports_color(Stdout, |x| x.green()));
+                    println!(
+                        "{pkg}: {}: {}",
+                        id.if_supports_color(Stdout, |x| x.cyan()),
+                        "Addon success!".if_supports_color(Stdout, |x| x.green())
+                    );
                 }
                 Err(e) => {
                     println!("{pkg}: {}", e.if_supports_color(Stdout, |x| x.red()));
